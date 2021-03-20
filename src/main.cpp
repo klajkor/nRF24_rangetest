@@ -30,8 +30,12 @@ nRF24L01 connections
 //#define RX_NODE 1
 
 #define AVG_SECONDS 10
+#define NRF24L01_COMM_CHANNEL 89U
 
+#ifdef RX_NODE
 U8GLIB_SSD1306_128X64 u8g(U8G_I2C_OPT_DEV_0|U8G_I2C_OPT_NO_ACK|U8G_I2C_OPT_FAST);	// Fast I2C / TWI
+#endif
+
 
 RF24 radio(9, 10);
 
@@ -77,19 +81,13 @@ void setup() {
   
   Serial.begin(115200);
   #ifdef RX_NODE
-    Oled_Init();
+  Oled_Init();
   #endif
   Radio_Init();  
   // Data initialization
   memset(&data, 0, sizeof(PacketData));  
   memset( packetCounts, 0, sizeof(packetCounts) );
   memset( avgs, 0, sizeof(avgs) );
-}
-
-void Oled_Init(void)
-{
-  u8g.setColorIndex(1);
-  u8g.setFont(u8g_font_fur11);
 }
 
 void Radio_Init(void)
@@ -101,16 +99,21 @@ void Radio_Init(void)
     delay(2000);
   }
   radio.setAutoAck(false);
+  radio.setChannel(NRF24L01_COMM_CHANNEL);
   radio.setPALevel(RF24_PA_MAX);
   radio.setDataRate(RF24_250KBPS);
+  radio.setCRCLength(RF24_CRC_8);
   #ifdef TX_NODE
     role++;
-    radio.openWritingPipe(pipe_address);    
+    radio.openWritingPipe(pipe_address);
+    radio.stopListening();
+    Serial.println(F("TX node init done"));
   #endif
   #ifdef RX_NODE
     role++;
     radio.openReadingPipe(1,pipe_address);
     radio.startListening();
+    Serial.println(F("RX node init done"));
   #endif
   if (role!=1)
   {
@@ -150,12 +153,23 @@ void TX_test(void)
     lastTick = now;
   }
     
-  radio.write(&data, sizeof(PacketData));    
+  if (!radio.write(&data, sizeof(PacketData)))
+  {
+    Serial.println(F("Data transmit failed"));
+  }
+  
 }
 #endif // TX_NODE
 
 /* Code below is for Receive Node only */
 #ifdef RX_NODE
+void Oled_Init(void)
+{
+  u8g.setColorIndex(1);
+  u8g.setFont(u8g_font_fur11);
+}
+
+
 void recvData(void)
 {  
   while ( radio.available() ) {        
@@ -166,9 +180,9 @@ void recvData(void)
 }
 
 void draw_screen(void) {
-  u8g.drawStr( 2, 24, ppsBuf);
-  u8g.drawStr( 2, 40, avgBuf);
-  u8g.drawStr( 2, 56, hmsBuf);
+  u8g.drawStr( 0, 24, ppsBuf);
+  u8g.drawStr( 0, 40, avgBuf);
+  u8g.drawStr( 0, 56, hmsBuf);
 }
 
 void updateScreen(void)
