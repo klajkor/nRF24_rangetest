@@ -1,6 +1,10 @@
 /*
-Simple transmitter, just sends 12-byte packet continously
-nRF24L01 library: https://github.com/gcopeland/RF24
+This code is based on the work of iforce2d.
+Link to his original code: http://www.iforce2d.net/sketches/nRFRangeTest30km.zip
+
+Transmitter: just sends 12-byte packet continously
+Receiver: display the statistics
+nRF24L01 library: https://github.com/maniacbug/RF24
 
 nRF24L01 connections 
  1 - GND
@@ -12,6 +16,23 @@ nRF24L01 connections
  7 - MISO to Arduino pin 12
  8 - UNUSED
  
+*/
+
+/*
+* Wiring, Arduino Uno/Nano
+*
+* SPI
+* ---
+* MOSI: 11
+* MISO: 12
+* SCK: 13
+* CE: 9
+* CSN: 10
+* 
+* I2C
+* ---
+* SDA: A4
+* SCL: A5
 */
 
 #include <Arduino.h>
@@ -31,13 +52,16 @@ nRF24L01 connections
 
 #define AVG_SECONDS 10
 #define NRF24L01_COMM_CHANNEL 89U
+#define PIN_NRF24L01_CE 9
+#define PIN_NRF24L01_CSN 10
+#define LNA_ENABLED true
 
 #ifdef RX_NODE
 U8GLIB_SSD1306_128X64 u8g(U8G_I2C_OPT_DEV_0|U8G_I2C_OPT_NO_ACK|U8G_I2C_OPT_FAST);	// Fast I2C / TWI
 #endif
 
 
-RF24 radio(9, 10);
+RF24 radio(PIN_NRF24L01_CE, PIN_NRF24L01_CSN);
 
 const uint64_t pipe_address =  0xE8E8F0F0E1LL;
 
@@ -100,7 +124,7 @@ void Radio_Init(void)
   }
   radio.setAutoAck(false);
   radio.setChannel(NRF24L01_COMM_CHANNEL);
-  radio.setPALevel(RF24_PA_MAX);
+  radio.setPALevel(RF24_PA_HIGH, LNA_ENABLED);
   radio.setDataRate(RF24_250KBPS);
   radio.setCRCLength(RF24_CRC_8);
   #ifdef TX_NODE
@@ -174,6 +198,9 @@ void recvData(void)
 {  
   while ( radio.available() ) {        
     radio.read(&data, sizeof(PacketData));
+    data.hours=data.hours % 100U;
+    data.minutes=data.minutes % 100U;
+    data.seconds=data.seconds % 100U;
     packetsRead++;
     lastRecvTime = millis();
   }
